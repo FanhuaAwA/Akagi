@@ -97,6 +97,7 @@ class Operation:
     Zimo = 8
     Hu = 9
     LiuJu = 10
+    BaBei = 11
 
 class OperationChiPengGang:
     Chi = 0
@@ -119,6 +120,7 @@ class MajsoulBridge(BridgeBase):
         self.accept_reach = None
         self.operation = {}
         self.AllReady = False
+        self.latest_self_operation_list: list[dict] = []
         self.temp = {}
         self.doras = []
         self.my_tehais = ["?"]*13
@@ -141,6 +143,7 @@ class MajsoulBridge(BridgeBase):
         self.accept_reach = None
         self.operation = {}
         self.AllReady = False
+        self.latest_self_operation_list = []
         self.temp = {}
         self.doras = []
         self.my_tehais = ["?"]*13
@@ -217,6 +220,7 @@ class MajsoulBridge(BridgeBase):
             })
             return ret
         if liqi_message['method'] == '.lq.ActionPrototype':
+            self._capture_self_operation_list(liqi_message)
             # start_kyoku
             if liqi_message['data']['name'] == 'ActionNewRound':
                 self.AllReady = False
@@ -495,6 +499,28 @@ class MajsoulBridge(BridgeBase):
             )
             return ret
         return ret
+
+    def _capture_self_operation_list(self, liqi_message: dict) -> None:
+        payload = liqi_message.get('data', {}).get('data', {})
+        operation = payload.get('operation')
+        if not operation:
+            actor_seat = payload.get('seat')
+            if actor_seat is not None and int(actor_seat) == self.seat:
+                self.latest_self_operation_list = []
+            return
+
+        seat = int(operation.get('seat', -1))
+        if seat != self.seat:
+            return
+
+        operation_list = operation.get('operationList', operation.get('operation_list', []))
+        self.latest_self_operation_list = [
+            {
+                'type': int(item.get('type', 0)),
+                'combination': list(item.get('combination', [])),
+            }
+            for item in operation_list
+        ]
         
     
     def build(self, command: dict) -> None | bytes:

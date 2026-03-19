@@ -1,6 +1,7 @@
 import os
 import json
 import importlib
+import pkgutil
 from .base.bot import Bot
 from .logger import logger
 from settings.settings import settings
@@ -20,26 +21,39 @@ class Controller(object):
     def list_available_bots(self) -> list[type[Bot]]:
         bots = []
         bots_names = []
-        # Get the current package folder
+
+        candidates: set[str] = set()
+
+        # 1) Discover subpackages via import system (works with source and frozen builds).
+        package_module = importlib.import_module(__package__)
+        for mod in pkgutil.iter_modules(package_module.__path__):
+            if not mod.ispkg:
+                continue
+            if mod.name.startswith("__") or mod.name == "base":
+                continue
+            candidates.add(mod.name)
+
+        # 2) Keep filesystem scan as a fallback.
         current_dir = os.path.dirname(__file__)
         for item in os.listdir(current_dir):
-            if item.startswith("__"):
-                continue
-            if item == "base":
+            if item.startswith("__") or item == "base":
                 continue
             dir_path = os.path.join(current_dir, item)
-            # Check if folder and has a bot.py file
-            if os.path.isdir(dir_path) and os.path.exists(os.path.join(dir_path, "bot.py")):
-                try:
-                    # Import the bot module using a relative import
-                    module = importlib.import_module(f".{item}.bot", package=__package__)
-                    if hasattr(module, "Bot"):
-                        bot_class = getattr(module, "Bot")
-                        bots.append(bot_class)
-                        bots_names.append(item)
-                except Exception as e:
-                    # Logging error or handling exception
-                    logger.error(f"Error importing bot from {item}: {e}")
+            if os.path.isdir(dir_path):
+                candidates.add(item)
+
+        # 3) Known builtin bots as safety-net for frozen layouts.
+        candidates.update({"mortal", "mortal3p"})
+
+        for item in sorted(candidates):
+            try:
+                module = importlib.import_module(f".{item}.bot", package=__package__)
+                if hasattr(module, "Bot"):
+                    bot_class = getattr(module, "Bot")
+                    bots.append(bot_class)
+                    bots_names.append(item)
+            except Exception as e:
+                logger.error(f"Error importing bot from {item}: {e}")
         self.available_bots = bots
         self.available_bots_names = bots_names
         return bots

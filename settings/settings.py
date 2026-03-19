@@ -8,6 +8,7 @@ from pathlib import Path
 from .logger import logger
 
 FILE_PATH = Path(__file__).resolve().parent
+PROJECT_ROOT = FILE_PATH.parent
 
 
 class MITMType(Enum):
@@ -40,6 +41,16 @@ class AutoplayTimeConfig:
     candidate: float
 
 @dataclasses.dataclass
+class AutoplayInputConfig:
+    bezier_smoothing: float
+    bezier_steps: int
+
+@dataclasses.dataclass
+class AutoplayOverlayConfig:
+    enabled: bool
+    scale: float
+
+@dataclasses.dataclass
 class Settings:
     mitm: MITMConfig
     theme: str
@@ -48,6 +59,8 @@ class Settings:
     autoplay: bool
     auto_switch_model: bool
     autoplay_time: AutoplayTimeConfig
+    autoplay_input: AutoplayInputConfig
+    autoplay_overlay: AutoplayOverlayConfig
     recommendation_temperature: float
     def update(self, settings: dict) -> None:
         """
@@ -72,6 +85,14 @@ class Settings:
             rand_max=settings["autoplay_time"]["rand_max"],
             candidate=settings["autoplay_time"]["candidate"]
         )
+        self.autoplay_input = AutoplayInputConfig(
+            bezier_smoothing=settings["autoplay_input"]["bezier_smoothing"],
+            bezier_steps=settings["autoplay_input"]["bezier_steps"]
+        )
+        self.autoplay_overlay = AutoplayOverlayConfig(
+            enabled=settings["autoplay_overlay"]["enabled"],
+            scale=settings["autoplay_overlay"]["scale"]
+        )
         self.recommendation_temperature = settings["recommendation_temperature"]
         self.save_ot_settings()
 
@@ -80,8 +101,8 @@ class Settings:
         Save the OT settings to the ot_settings.json file in the mjai_bot directory
         """
         # Find the ot_settings.json file
-        ot_setting = Path.cwd() / "mjai_bot" / "mortal" / "ot_settings.json"
-        ot_setting_3p = Path.cwd() / "mjai_bot" / "mortal3p" / "ot_settings.json"
+        ot_setting = PROJECT_ROOT / "mjai_bot" / "mortal" / "ot_settings.json"
+        ot_setting_3p = PROJECT_ROOT / "mjai_bot" / "mortal3p" / "ot_settings.json"
 
         if ot_setting.exists():
             # If the file exists, update it with the new settings
@@ -128,6 +149,14 @@ class Settings:
                     "rand_min": self.autoplay_time.rand_min,
                     "rand_max": self.autoplay_time.rand_max,
                     "candidate": self.autoplay_time.candidate
+                },
+                "autoplay_input": {
+                    "bezier_smoothing": self.autoplay_input.bezier_smoothing,
+                    "bezier_steps": self.autoplay_input.bezier_steps
+                },
+                "autoplay_overlay": {
+                    "enabled": self.autoplay_overlay.enabled,
+                    "scale": self.autoplay_overlay.scale
                 },
                 "recommendation_temperature": self.recommendation_temperature
             }, f, indent=4)
@@ -184,6 +213,14 @@ def load_settings() -> Settings:
                     "rand_max": 3,
                     "candidate": 0.5
                 },
+                "autoplay_input": {
+                    "bezier_smoothing": 0.35,
+                    "bezier_steps": 18
+                },
+                "autoplay_overlay": {
+                    "enabled": True,
+                    "scale": 1.0
+                },
                 "recommendation_temperature": 0.3
             }, f, indent=4)
         logger.info(f"Created new settings.json with default values")
@@ -220,6 +257,14 @@ def load_settings() -> Settings:
             rand_min=settings["autoplay_time"]["rand_min"],
             rand_max=settings["autoplay_time"]["rand_max"],
             candidate=settings["autoplay_time"]["candidate"]
+        ),
+        autoplay_input=AutoplayInputConfig(
+            bezier_smoothing=settings["autoplay_input"]["bezier_smoothing"],
+            bezier_steps=settings["autoplay_input"]["bezier_steps"]
+        ),
+        autoplay_overlay=AutoplayOverlayConfig(
+            enabled=settings["autoplay_overlay"]["enabled"],
+            scale=settings["autoplay_overlay"]["scale"]
         ),
         recommendation_temperature=settings["recommendation_temperature"]
     )

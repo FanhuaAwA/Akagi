@@ -85,12 +85,45 @@
       "required": ["first_tile", "rand_min", "rand_max", "candidate"],
       "additionalProperties": false
     },
+    "autoplay_input": {
+      "type": "object",
+      "description": "Mouse movement tuning for autoplay input.",
+      "properties": {
+        "bezier_smoothing": {
+          "type": "number",
+          "description": "Bezier smoothing amount from 0 to 1."
+        },
+        "bezier_steps": {
+          "type": "integer",
+          "description": "Number of interpolation steps for the mouse path.",
+          "minimum": 6
+        }
+      },
+      "required": ["bezier_smoothing", "bezier_steps"],
+      "additionalProperties": false
+    },
+    "autoplay_overlay": {
+      "type": "object",
+      "description": "Overlay recommendation marker settings.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to show overlay markers above recommended tiles."
+        },
+        "scale": {
+          "type": "number",
+          "description": "Overlay marker size scale."
+        }
+      },
+      "required": ["enabled", "scale"],
+      "additionalProperties": false
+    },
     "recommendation_temperature": {
       "type": "number",
       "description": "Temperature setting for recommendation softmax scaling."
     }
   },
-  "required": ["mitm", "model", "theme", "ot_server", "autoplay", "auto_switch_model", "recommendation_temperature"],
+  "required": ["mitm", "model", "theme", "ot_server", "autoplay", "auto_switch_model", "autoplay_time", "autoplay_input", "autoplay_overlay", "recommendation_temperature"],
   "description": "Settings for the application.",
   "additionalProperties": false
 }

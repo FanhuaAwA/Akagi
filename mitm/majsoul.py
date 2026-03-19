@@ -84,3 +84,14 @@ async def start_proxy(host, port):
 
 def stop_proxy():
     ctx.master.shutdown()
+
+
+def get_latest_self_operation_list() -> list[dict]:
+    global activated_flows, majsoul_bridges
+    if not activated_flows:
+        return []
+    flow_id = activated_flows[-1]
+    bridge = majsoul_bridges.get(flow_id)
+    if bridge is None:
+        return []
+    return list(bridge.latest_self_operation_list)

@@ -19,5 +19,13 @@
         "rand_max": 3.0,
         "candidate": 0.5
     },
+    "autoplay_input": {
+        "bezier_smoothing": 0.35,
+        "bezier_steps": 18
+    },
+    "autoplay_overlay": {
+        "enabled": true,
+        "scale": 1.0
+    },
     "recommendation_temperature": 0.3
 }

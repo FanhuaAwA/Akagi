@@ -256,11 +256,11 @@ class SettingsScreen(Screen):
                     title="MITM Settings Changed",
                     severity="information",
                 )
-            if settings.autoplay:
+            if settings.autoplay or settings.autoplay_overlay.enabled:
                 if settings.mitm.type.value in ["tenhou", "unified"]:
                     self.app.notify(
-                        f"Autoplay does not support {settings.mitm.type.value} yet, please disable it.",
-                        title="Autoplay Warning",
+                        f"Overlay / autoplay does not support {settings.mitm.type.value} yet, please disable it.",
+                        title="Autoplay Overlay Warning",
                         severity="warning",
                     )
                 else:
@@ -1047,6 +1047,7 @@ class AkagiApp(App):
                 mjai_response = mjai_controller.react(mjai_msgs)
                 logger.debug(f"<- {mjai_response}")
                 mjai_bot.react(input_list=mjai_msgs)
+                autoplay.observe_mjai_messages(mjai_msgs)
                 mjai_out_log: RichLog = self.query_one("#mjai_out_log")
                 if (
                     ((mjai_response["type"] != "none" or mjai_bot.can_act   ) and (not mjai_bot.is_3p)) or
@@ -1064,6 +1065,7 @@ class AkagiApp(App):
                 best_action.update_best_action(mjai_response)
                 recommendation: Recommendations = self.query_one("#recommendation")
                 recommendation.update_recommendation(mjai_response)
+                autoplay.update_overlay(mjai_response)
                 # ============================================= #
                 #             Autoplay and Actions              #
                 # ============================================= #
@@ -1110,9 +1112,9 @@ class AkagiApp(App):
         try:
             act_result = autoplay.act(mjai_response)
             if not act_result:
-                logger.warning("Action not preformed.")
+                logger.warning("Action not performed.")
                 self.app.notify(
-                    "Action not preformed, please check the logs.",
+                    "Action not performed, please check the logs.",
                     title="Autoplay Warning",
                     severity="warning",
                 )
