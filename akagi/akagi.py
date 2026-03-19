@@ -557,107 +557,111 @@ class Recommendation(Horizontal):
 
     def update_recommendation(self, recommend: tuple[str, float]) -> None:
         global mjai_bot
-        action_name: dict[str, str] = {
-            "reach": "Reach",
-            "chi_low": "Chi",
-            "chi_mid": "Chi",
-            "chi_high": "Chi",
-            "pon": "Pon",
-            "kan_select": "Kan",
-            "hora": "Hora",
-            "ryukyoku": "Ryukyoku",
-            "none": "None",
-            "nukidora": "Nukidora",
-        }
-        if (recommend[0] in action_name):
-            action = action_name[recommend[0]]
-        else:
-            action = "Dahai"
-
         recommendation_button: Button = self.query_one("#recommendation_button")
         recommendation_tile: Label = self.query_one("#recommendation_tile")
         recommendation_rule: Label = self.query_one("#recommendation_rule")
-        recommendation_consume: Consume = self.query_one("#recommendation_consume")        
+        recommendation_consume: Consume = self.query_one("#recommendation_consume")
         recommendation_score: Digits = self.query_one("#recommendation_score")
 
-        recommendation_button.label = action
-        recommendation_button.set_classes([action])
-        if recommend[0] in ("reach"):
-            # We don't know the tile to reach, so we use "?"
-            # This is because MJAI protocol doesn't provide the tile to reach
-            assert mjai_bot.can_riichi
-            recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
-            recommendation_rule.update(EMPTY_VERTICAL_RULE)
-            recommendation_consume.clear_consume()
-        elif recommend[0] in ("chi_low", "chi_mid", "chi_high"):
-            chi_candidates = mjai_bot.find_chi_candidates_simple()
-            if recommend[0] == "chi_low":
-                assert mjai_bot.can_chi_low
-                assert chi_candidates.chi_low_meld is not None
-                recommendation_tile.update(TILE_2_UNICODE_ART_RICH[chi_candidates.chi_low_meld[0]])
-                recommendation_rule.update(VERTICAL_RULE)
-                recommendation_consume.update_consume(chi_candidates.chi_low_meld[1])
-            elif recommend[0] == "chi_mid":
-                assert mjai_bot.can_chi_mid
-                assert chi_candidates.chi_mid_meld is not None
-                recommendation_tile.update(TILE_2_UNICODE_ART_RICH[chi_candidates.chi_mid_meld[0]])
-                recommendation_rule.update(VERTICAL_RULE)
-                recommendation_consume.update_consume(chi_candidates.chi_mid_meld[1])
-            elif recommend[0] == "chi_high":
-                assert mjai_bot.can_chi_high
-                assert chi_candidates.chi_high_meld is not None
-                recommendation_tile.update(TILE_2_UNICODE_ART_RICH[chi_candidates.chi_high_meld[0]])
-                recommendation_rule.update(VERTICAL_RULE)
-                recommendation_consume.update_consume(chi_candidates.chi_high_meld[1])
-        elif recommend[0] in ("pon"):
-            assert mjai_bot.can_pon
-            recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_kawa_tile])
-            recommendation_rule.update(VERTICAL_RULE)
-            recommendation_consume.update_consume([mjai_bot.last_kawa_tile[:2], mjai_bot.last_kawa_tile[:2]])
-        elif recommend[0] in ("kan_select"):
-            assert mjai_bot.can_kan
-            if mjai_bot.can_daiminkan:
-                # When we can daiminkan, this is the only way to kan.
-                recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_kawa_tile])
-                recommendation_rule.update(VERTICAL_RULE)
-                recommendation_consume.update_consume([mjai_bot.last_kawa_tile[:2]]*3)
+        try:
+            action_name: dict[str, str] = {
+                "reach": "Reach",
+                "chi_low": "Chi",
+                "chi_mid": "Chi",
+                "chi_high": "Chi",
+                "pon": "Pon",
+                "kan_select": "Kan",
+                "hora": "Hora",
+                "ryukyoku": "Ryukyoku",
+                "none": "None",
+                "nukidora": "Nukidora",
+            }
+            if (recommend[0] in action_name):
+                action = action_name[recommend[0]]
             else:
-                # We don't know the tile to kan, so we use "?"
-                # At some rare cases, we can have multiple kan options
-                # but we don't know which one to choose, so we use "?"
-                # This is because of Mortal model's limitation.
+                action = "Dahai"
+
+            recommendation_button.label = action
+            recommendation_button.set_classes([action])
+            if recommend[0] in ("reach"):
+                # We don't know the tile to reach, so we use "?"
+                # This is because MJAI protocol doesn't provide the tile to reach
+                assert mjai_bot.can_riichi
                 recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
                 recommendation_rule.update(EMPTY_VERTICAL_RULE)
                 recommendation_consume.clear_consume()
-        elif recommend[0] in ("hora"):
-            assert mjai_bot.can_agari
-            if mjai_bot.can_ron_agari:
+            elif recommend[0] in ("chi_low", "chi_mid", "chi_high"):
+                chi_candidates = mjai_bot.find_chi_candidates_simple()
+                if recommend[0] == "chi_low":
+                    assert mjai_bot.can_chi_low
+                    assert chi_candidates.chi_low_meld is not None
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH[chi_candidates.chi_low_meld[0]])
+                    recommendation_rule.update(VERTICAL_RULE)
+                    recommendation_consume.update_consume(chi_candidates.chi_low_meld[1])
+                elif recommend[0] == "chi_mid":
+                    assert mjai_bot.can_chi_mid
+                    assert chi_candidates.chi_mid_meld is not None
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH[chi_candidates.chi_mid_meld[0]])
+                    recommendation_rule.update(VERTICAL_RULE)
+                    recommendation_consume.update_consume(chi_candidates.chi_mid_meld[1])
+                elif recommend[0] == "chi_high":
+                    assert mjai_bot.can_chi_high
+                    assert chi_candidates.chi_high_meld is not None
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH[chi_candidates.chi_high_meld[0]])
+                    recommendation_rule.update(VERTICAL_RULE)
+                    recommendation_consume.update_consume(chi_candidates.chi_high_meld[1])
+            elif recommend[0] in ("pon"):
+                assert mjai_bot.can_pon
                 recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_kawa_tile])
+                recommendation_rule.update(VERTICAL_RULE)
+                recommendation_consume.update_consume([mjai_bot.last_kawa_tile[:2], mjai_bot.last_kawa_tile[:2]])
+            elif recommend[0] in ("kan_select"):
+                assert mjai_bot.can_kan
+                if mjai_bot.can_daiminkan:
+                    # When we can daiminkan, this is the only way to kan.
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_kawa_tile])
+                    recommendation_rule.update(VERTICAL_RULE)
+                    recommendation_consume.update_consume([mjai_bot.last_kawa_tile[:2]]*3)
+                else:
+                    # We don't know the tile to kan, so we use "?"
+                    # At some rare cases, we can have multiple kan options
+                    # but we don't know which one to choose, so we use "?"
+                    # This is because of Mortal model's limitation.
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
+                    recommendation_rule.update(EMPTY_VERTICAL_RULE)
+                    recommendation_consume.clear_consume()
+            elif recommend[0] in ("hora"):
+                assert mjai_bot.can_agari
+                if mjai_bot.can_ron_agari:
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_kawa_tile])
+                    recommendation_rule.update(EMPTY_VERTICAL_RULE)
+                    recommendation_consume.clear_consume()
+                elif mjai_bot.can_tsumo_agari:
+                    recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_self_tsumo])
+                    recommendation_rule.update(EMPTY_VERTICAL_RULE)
+                    recommendation_consume.clear_consume()
+            elif recommend[0] in ("ryukyoku"):
+                assert mjai_bot.can_ryukyoku
+                recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
                 recommendation_rule.update(EMPTY_VERTICAL_RULE)
                 recommendation_consume.clear_consume()
-            elif mjai_bot.can_tsumo_agari:
-                recommendation_tile.update(TILE_2_UNICODE_ART_RICH[mjai_bot.last_self_tsumo])
+            elif recommend[0] in ("none"):
+                recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
                 recommendation_rule.update(EMPTY_VERTICAL_RULE)
                 recommendation_consume.clear_consume()
-        elif recommend[0] in ("ryukyoku"):
-            assert mjai_bot.can_ryukyoku
-            recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
-            recommendation_rule.update(EMPTY_VERTICAL_RULE)
-            recommendation_consume.clear_consume()
-        elif recommend[0] in ("none"):
-            recommendation_tile.update(TILE_2_UNICODE_ART_RICH["?"])
-            recommendation_rule.update(EMPTY_VERTICAL_RULE)
-            recommendation_consume.clear_consume()
-        elif recommend[0] in ("nukidora"):
-            recommendation_tile.update(TILE_2_UNICODE_ART_RICH["N"])
-            recommendation_rule.update(EMPTY_VERTICAL_RULE)
-            recommendation_consume.clear_consume()
-        else:
-            assert mjai_bot.can_discard
-            recommendation_tile.update(TILE_2_UNICODE_ART_RICH[recommend[0]])
-            recommendation_rule.update(EMPTY_VERTICAL_RULE)
-            recommendation_consume.clear_consume()
-        recommendation_score.update(f"{recommend[1]*100:.2f}")
+            elif recommend[0] in ("nukidora"):
+                recommendation_tile.update(TILE_2_UNICODE_ART_RICH["N"])
+                recommendation_rule.update(EMPTY_VERTICAL_RULE)
+                recommendation_consume.clear_consume()
+            else:
+                assert mjai_bot.can_discard
+                recommendation_tile.update(TILE_2_UNICODE_ART_RICH[recommend[0]])
+                recommendation_rule.update(EMPTY_VERTICAL_RULE)
+                recommendation_consume.clear_consume()
+            recommendation_score.update(f"{recommend[1]*100:.2f}")
+        except Exception as e:
+            logger.warning(f"Skipping invalid recommendation {recommend}: {e}")
+            self.clear_recommendation()
 
     def clear_recommendation(self) -> None:
         recommendation_button: Button = self.query_one("#recommendation_button")
@@ -1049,9 +1053,13 @@ class AkagiApp(App):
                 mjai_bot.react(input_list=mjai_msgs)
                 autoplay.observe_mjai_messages(mjai_msgs)
                 mjai_out_log: RichLog = self.query_one("#mjai_out_log")
+                can_auto_action = (
+                    (not mjai_bot.is_3p and (mjai_bot.can_act or mjai_bot.can_pass)) or
+                    (mjai_bot.is_3p and (mjai_bot.can_act_3p or mjai_bot.can_pass))
+                )
                 if (
-                    ((mjai_response["type"] != "none" or mjai_bot.can_act   ) and (not mjai_bot.is_3p)) or
-                    ((mjai_response["type"] != "none" or mjai_bot.can_act_3p) and (    mjai_bot.is_3p))
+                    mjai_response["type"] != "none" or
+                    can_auto_action
                 ):
                     mjai_out_log.write(mjai_response)
                 # ============================================= #
@@ -1070,8 +1078,8 @@ class AkagiApp(App):
                 #             Autoplay and Actions              #
                 # ============================================= #
                 if (
-                    ((mjai_response["type"] != "none" or mjai_bot.can_act   ) and (not mjai_bot.is_3p)) or
-                    ((mjai_response["type"] != "none" or mjai_bot.can_act_3p) and (    mjai_bot.is_3p))
+                    mjai_response["type"] != "none" or
+                    can_auto_action
                 ):
                     if settings.autoplay:
                         self.set_timer(0.1, partial(self.autoplay, mjai_response))
@@ -1102,13 +1110,10 @@ class AkagiApp(App):
         Autoplay function to handle MJAI messages.
         """
         global autoplay, mitm_client, mjai_controller
-        if settings.mitm.type.value in ["tenhou", "unified"]:
-            # Riichi City, Tenhou do not support autoplay
-            logger.warning("Autoplay is not supported for this MJAI type")
+        if settings.mitm.type != MITMType.MAJSOUL:
+            logger.warning(f"Autoplay network injection is only supported for majsoul, current={settings.mitm.type.value}")
             return
 
-        if (not autoplay.check_window()):
-            self.find_autoplay_window()
         try:
             act_result = autoplay.act(mjai_response)
             if not act_result:
@@ -1126,7 +1131,7 @@ class AkagiApp(App):
                 severity="error",
             )
             return
-        if mjai_response["type"] == "reach":
+        if mjai_response.get("type") == "reach" and mjai_response.get("pai") is None:
             mitm_client.messages.put({
                 "type": "reach",
                 "actor": mjai_controller.bot.player_id,

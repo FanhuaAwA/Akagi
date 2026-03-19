@@ -341,6 +341,7 @@ class AkagiBot(Bot):
             self.can_pon or
             self.can_agari or
             self.can_ryukyoku or
-            self.can_kan 
+            self.can_kan or
+            self.can_pass
             # self.tehai_vec34[9*3+3] > 0 # nukidora
         )

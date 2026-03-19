@@ -67,6 +67,7 @@ class AutoPlay:
         self.bot = None
         self._target_hwnd: int | None = None
         self._planner = ActionPlanner()
+        self._pending_network_reach = False
         self._overlay: RecommendationOverlay | None = None
         self._user32 = ctypes.windll.user32 if hasattr(ctypes, "windll") else None
         self._input = ctypes.windll.user32 if hasattr(ctypes, "windll") else None
@@ -84,12 +85,10 @@ class AutoPlay:
         self.bot = bot
 
     def set_autoplay(self):
-        if self._user32 is None:
-            logger.warning("Autoplay is only available on Windows.")
-            return
-
-        if settings.autoplay_overlay.enabled and self._overlay is None:
+        if settings.autoplay_overlay.enabled and self._overlay is None and self._user32 is not None:
             self._overlay = RecommendationOverlay()
+        elif settings.autoplay_overlay.enabled and self._user32 is None:
+            logger.warning("Autoplay overlay requires Windows window APIs.")
 
     def get_windows(self) -> list[WindowObject]:
         if self._user32 is None:
@@ -156,6 +155,8 @@ class AutoPlay:
     def observe_mjai_messages(self, mjai_msgs: list[dict]) -> None:
         for mjai_msg in mjai_msgs:
             self._planner.observe_event(mjai_msg)
+            if mjai_msg.get("type") in {"start_kyoku", "end_kyoku", "end_game"}:
+                self._pending_network_reach = False
 
     def update_overlay(self, mjai_msg: dict) -> None:
         if not settings.autoplay_overlay.enabled:
@@ -209,40 +210,121 @@ class AutoPlay:
         self._overlay.update(payload)
 
     def act(self, mjai_msg: dict) -> bool:
-        if self.bot is None or self._user32 is None:
+        if settings.mitm.type != MITMType.MAJSOUL:
             return False
-        if not self.check_window():
+        action = self._normalize_action_for_network(mjai_msg)
+        if action is None:
+            return True
+        try:
+            from mitm.majsoul import enqueue_action, get_latest_action_step
+
+            delay = self._network_delay_for_action(action)
+            action["_step_token"] = int(get_latest_action_step())
+            action["_retries_left"] = self._network_retry_budget(action)
+            enqueue_action(action, delay=delay)
+            logger.debug(f"Queued autoplay network action after {delay:.3f}s: {action}")
+            return True
+        except Exception as exc:
+            logger.error(f"Failed to queue autoplay network action {action}: {exc}")
             return False
 
-        tehai, tsumohai = self._current_hand()
-        latest_operation_list = self._latest_operation_list()
-        self._planner.update_operation_list(latest_operation_list)
-        plan = self._planner.plan(mjai_msg, tehai, tsumohai, bot=self.bot)
-        if not plan:
-            logger.debug(
-                f"No autoplay plan for action={mjai_msg.get('type')} "
-                f"pai={mjai_msg.get('pai')} tsumogiri={mjai_msg.get('tsumogiri')} "
-                f"tehai={tehai} tsumohai={tsumohai} operations={latest_operation_list}"
-            )
-            return False
+    def _normalize_action_for_network(self, mjai_msg: dict) -> dict | None:
+        action_type = mjai_msg.get("type")
+        if action_type is None:
+            return None
 
-        self._focus_target_window()
-        last_success = False
-        for click in plan:
-            time.sleep(max(click.delay, 0.0))
-            geometry = self._get_window_geometry(self._target_hwnd)
-            if geometry is None:
-                return False
-            target = self._normalized_to_screen(geometry, click.coord)
-            logger.debug(f"Autoplay click '{click.label}' at {target}.")
-            self._move_mouse_with_curve(target)
-            self._user32.SetCursorPos(target[0], target[1])
-            time.sleep(0.015)
-            last_success = self._click_with_retry(target, click.expected_types or None)
-            if not last_success:
-                logger.warning(f"Autoplay click did not complete for {click.label}.")
-                return False
-        return last_success
+        supported = {
+            "none",
+            "dahai",
+            "chi",
+            "pon",
+            "ankan",
+            "daiminkan",
+            "kakan",
+            "reach",
+            "hora",
+            "ryukyoku",
+            "nukidora",
+        }
+        if action_type not in supported:
+            return None
+
+        if action_type == "reach":
+            if mjai_msg.get("pai") is None:
+                self._pending_network_reach = True
+                logger.debug("Received reach without tile, waiting for follow-up discard.")
+                return None
+            self._pending_network_reach = False
+
+        if action_type == "dahai" and self._pending_network_reach:
+            self._pending_network_reach = False
+            consumed = mjai_msg.get("consumed")
+            return {
+                "type": "reach",
+                "pai": mjai_msg.get("pai"),
+                "tsumogiri": bool(mjai_msg.get("tsumogiri")),
+                "consumed": list(consumed) if isinstance(consumed, list) else [],
+            }
+
+        command: dict = {"type": action_type}
+        if "pai" in mjai_msg:
+            command["pai"] = mjai_msg.get("pai")
+        if "tsumogiri" in mjai_msg:
+            command["tsumogiri"] = bool(mjai_msg.get("tsumogiri"))
+        if "consumed" in mjai_msg:
+            consumed = mjai_msg.get("consumed")
+            command["consumed"] = list(consumed) if isinstance(consumed, list) else []
+        return command
+
+    def _network_delay_for_action(self, action: dict) -> float:
+        action_type = action.get("type")
+        delay = 0.0
+        if action_type == "dahai":
+            delay = self._planner.discard_delay()
+            self._planner.is_new_round = False
+        elif action_type == "reach":
+            self._planner.is_new_round = False
+            self._planner.reached = True
+            self._planner.pending_reach_discard = False
+            delay = max(settings.autoplay_time.candidate, 0.0)
+        elif action_type in {"chi", "pon", "ankan", "kakan", "none", "daiminkan", "hora", "ryukyoku", "nukidora"}:
+            delay = max(settings.autoplay_time.candidate, 0.0)
+        return self._clamp_delay_to_operation_window(delay)
+
+    def _network_retry_budget(self, action: dict) -> int:
+        action_type = action.get("type")
+        if action_type in {"none", "chi", "pon", "ankan", "kakan", "daiminkan", "hora", "ryukyoku", "nukidora"}:
+            return 1
+        return 0
+
+    def _clamp_delay_to_operation_window(self, delay: float) -> float:
+        remaining = self._remaining_operation_seconds()
+        if remaining is None:
+            return max(delay, 0.0)
+        # Keep a small margin to avoid missing the operation window due to scheduling jitter.
+        max_allowed = max(remaining - 0.12, 0.0)
+        return max(0.0, min(delay, max_allowed))
+
+    def _remaining_operation_seconds(self) -> float | None:
+        if settings.mitm.type != MITMType.MAJSOUL:
+            return None
+        try:
+            from mitm.majsoul import get_latest_self_operation_timing
+
+            timing = get_latest_self_operation_timing()
+        except Exception:
+            return None
+
+        if not timing:
+            return None
+        captured_at = timing.get("captured_at")
+        if captured_at is None:
+            return None
+        total_ms = int(timing.get("time_fixed_ms", 0) or 0) + int(timing.get("time_add_ms", 0) or 0)
+        if total_ms <= 0:
+            return None
+        elapsed = max(0.0, time.monotonic() - float(captured_at))
+        return max(total_ms / 1000.0 - elapsed, 0.0)
 
     def _current_hand(self) -> tuple[list[str], str | None]:
         tehai = list(getattr(self.bot, "tehai_mjai", []))

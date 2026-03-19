@@ -17,6 +17,7 @@ class Controller(object):
         self.choose_bot_name(settings.model)
         self.temp_mjai_msg: list[dict] = []
         self.starting_game: bool = False
+        self._last_tsumo_by_actor: dict[int, str] = {}
 
     def list_available_bots(self) -> list[type[Bot]]:
         bots = []
@@ -88,14 +89,44 @@ class Controller(object):
                 return {"type": "none"}
             events = self.temp_mjai_msg + events
             self.temp_mjai_msg = []
+            events = self._normalize_events(events)
             ans = self.bot.react(json.dumps(events, separators=(",", ":")))
             return json.loads(ans)
         else:
             if not self.bot:
                 logger.error("No bot available")
                 return {"type": "none"}
+            events = self._normalize_events(events)
             ans = self.bot.react(json.dumps(events, separators=(",", ":")))
             return json.loads(ans)
+
+    def _normalize_events(self, events: list[dict]) -> list[dict]:
+        normalized_events: list[dict] = []
+        for event in events:
+            event_type = event["type"]
+            if event_type in {"start_game", "start_kyoku", "end_game"}:
+                self._last_tsumo_by_actor.clear()
+            if event_type == "tsumo":
+                self._last_tsumo_by_actor[event["actor"]] = event["pai"]
+                normalized_events.append(event)
+                continue
+            if event_type == "nukidora":
+                actor = event["actor"]
+                normalized_event = {
+                    "type": "dahai",
+                    "actor": actor,
+                    "pai": "N",
+                    "tsumogiri": self._last_tsumo_by_actor.get(actor) == "N",
+                }
+                self._last_tsumo_by_actor.pop(actor, None)
+                logger.debug(f"Normalized controller event: {event} -> {normalized_event}")
+                normalized_events.append(normalized_event)
+                continue
+            actor = event.get("actor")
+            if actor is not None and event_type != "dora":
+                self._last_tsumo_by_actor.pop(actor, None)
+            normalized_events.append(event)
+        return normalized_events
 
     def choose_bot_index(self, bot_index: int) -> bool:
         if 0 <= bot_index < len(self.available_bots):
